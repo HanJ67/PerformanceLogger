@@ -46,6 +46,18 @@ button, select {
     margin-top: 15px;
     font-weight: bold;
 }
+
+#charCounter {
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.info {
+    margin-top: 5px;
+    color: #444;
+    font-size: 0.9em;
+}
 </style>
 </head>
 <body>
@@ -69,21 +81,35 @@ button, select {
 
 <hr>
 
-<label for="message">Tekst verzenden (max 100 karakters)</label>
-<textarea id="message" maxlength="100"></textarea>
+<label for="message">
+    Bericht (WelcomeText: wordt automatisch toegevoegd)
+</label>
 
-<br>
+<textarea id="message" maxlength="88"></textarea>
 
-<button id="sendBtn" disabled>Versturen</button>
+<div id="charCounter">
+88 karakters beschikbaar
+</div>
+
+<div class="info">
+Verzonden formaat: WelcomeText:JouwTekst
+</div>
+
+<button id="sendBtn" disabled>
+Versturen
+</button>
 
 <hr>
 
 <label for="response">Response</label>
+
 <textarea id="response" readonly></textarea>
 
 <br>
 
-<button id="clearBtn">Response wissen</button>
+<button id="clearBtn">
+Response wissen
+</button>
 
 <script>
 let port = null;
@@ -91,17 +117,31 @@ let writer = null;
 let reader = null;
 let keepReading = false;
 
+const PREFIX = "WelcomeText:";
+const MAX_TOTAL = 100;
+const MAX_INPUT = MAX_TOTAL - PREFIX.length;
+
 const connectBtn = document.getElementById("connectBtn");
 const sendBtn = document.getElementById("sendBtn");
 const clearBtn = document.getElementById("clearBtn");
 const statusDiv = document.getElementById("status");
 const responseBox = document.getElementById("response");
+const messageBox = document.getElementById("message");
+const charCounter = document.getElementById("charCounter");
 
 if (!("serial" in navigator)) {
     statusDiv.textContent =
-        "Deze browser ondersteunt Web Serial niet. Gebruik Chrome of Edge.";
+        "Web Serial API wordt niet ondersteund. Gebruik Chrome of Edge.";
     connectBtn.disabled = true;
 }
+
+messageBox.addEventListener("input", () => {
+    const remaining =
+        MAX_INPUT - messageBox.value.length;
+
+    charCounter.textContent =
+        remaining + " karakters beschikbaar";
+});
 
 async function readSerial() {
     const decoder = new TextDecoder();
@@ -111,117 +151,21 @@ async function readSerial() {
             reader = port.readable.getReader();
 
             while (keepReading) {
-                const { value, done } = await reader.read();
+                const { value, done } =
+                    await reader.read();
 
                 if (done) {
                     break;
                 }
 
                 if (value) {
-                    const text = decoder.decode(value);
+                    const text =
+                        decoder.decode(value);
 
                     responseBox.value += text;
                     responseBox.scrollTop =
                         responseBox.scrollHeight;
                 }
             }
-        } catch (error) {
-            console.error(error);
-            statusDiv.textContent =
-                "Leesfout: " + error.message;
-        } finally {
-            if (reader) {
-                reader.releaseLock();
-            }
         }
-    }
-}
-
-connectBtn.addEventListener("click", async () => {
-    try {
-        const baudRate =
-            parseInt(document.getElementById("baudrate").value);
-
-        port = await navigator.serial.requestPort();
-
-        await port.open({
-            baudRate: baudRate,
-            dataBits: 8,
-            stopBits: 1,
-            parity: "none",
-            flowControl: "none"
-        });
-
-        writer = port.writable.getWriter();
-
-        keepReading = true;
-        readSerial();
-
-        sendBtn.disabled = false;
-
-        statusDiv.textContent =
-            "Verbonden @ " + baudRate + " baud";
-
-    } catch (error) {
-        statusDiv.textContent =
-            "Verbindingsfout: " + error.message;
-    }
-});
-
-sendBtn.addEventListener("click", async () => {
-    const message =
-        document.getElementById("message").value;
-
-    if (!message.trim()) {
-        alert("Voer eerst een bericht in.");
-        return;
-    }
-
-    if (message.length > 100) {
-        alert("Maximaal 100 karakters toegestaan.");
-        return;
-    }
-
-    try {
-        const encoder = new TextEncoder();
-
-        await writer.write(
-            encoder.encode(message + "\r\n")
-        );
-
-        statusDiv.textContent =
-            "Verzonden (" + message.length + " karakters)";
-    } catch (error) {
-        statusDiv.textContent =
-            "Verzendfout: " + error.message;
-    }
-});
-
-clearBtn.addEventListener("click", () => {
-    responseBox.value = "";
-});
-
-window.addEventListener("beforeunload", async () => {
-    try {
-        keepReading = false;
-
-        if (reader) {
-            await reader.cancel();
-        }
-
-        if (writer) {
-            writer.releaseLock();
-        }
-
-        if (port) {
-            await port.close();
-        }
-    } catch (e) {
-        console.error(e);
-    }
-});
-</script>
-
-</body>
-</html>
 ```
