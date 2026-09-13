@@ -168,4 +168,131 @@ async function readSerial() {
                 }
             }
         }
+        catch (err) {
+            console.error(err);
+        }
+        finally {
+            if (reader) {
+                reader.releaseLock();
+            }
+        }
+    }
+}
+
+connectBtn.addEventListener("click", async () => {
+    try {
+        const baudRate =
+            parseInt(
+                document.getElementById("baudrate").value
+            );
+
+        port = await navigator.serial.requestPort();
+
+        await port.open({
+            baudRate: baudRate,
+            dataBits: 8,
+            stopBits: 1,
+            parity: "none",
+            flowControl: "none"
+        });
+
+        writer = port.writable.getWriter();
+
+        keepReading = true;
+        readSerial();
+
+        sendBtn.disabled = false;
+
+        statusDiv.textContent =
+            "Verbonden @ " +
+            baudRate +
+            " baud";
+
+    }
+    catch (err) {
+        statusDiv.textContent =
+            "Verbindingsfout: " +
+            err.message;
+    }
+});
+
+sendBtn.addEventListener("click", async () => {
+
+    const userText =
+        messageBox.value.trim();
+
+    if (!userText) {
+        alert("Voer een bericht in.");
+        return;
+    }
+
+    const fullMessage =
+        PREFIX + userText;
+
+    if (fullMessage.length > MAX_TOTAL) {
+        alert(
+            "Maximum van 100 karakters overschreden."
+        );
+        return;
+    }
+
+    try {
+        const encoder =
+            new TextEncoder();
+
+        await writer.write(
+            encoder.encode(
+                fullMessage + "\r\n"
+            )
+        );
+
+        statusDiv.textContent =
+            "Verzonden: " +
+            fullMessage.length +
+            "/" +
+            MAX_TOTAL +
+            " karakters";
+
+    }
+    catch (err) {
+        statusDiv.textContent =
+            "Verzendfout: " +
+            err.message;
+    }
+});
+
+clearBtn.addEventListener("click", () => {
+    responseBox.value = "";
+});
+
+window.addEventListener(
+    "beforeunload",
+    async () => {
+
+        try {
+
+            keepReading = false;
+
+            if (reader) {
+                await reader.cancel();
+            }
+
+            if (writer) {
+                writer.releaseLock();
+            }
+
+            if (port) {
+                await port.close();
+            }
+
+        }
+        catch (err) {
+            console.error(err);
+        }
+    }
+);
+</script>
+
+</body>
+</html>
 ```
